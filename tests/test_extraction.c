@@ -165,6 +165,55 @@ TEST(extract_cpp_macros_issue375) {
     PASS();
 }
 
+/* #1071: a function-like macro invocation whose argument is a TYPE token
+ * (SYNTH_ALLOC_ARRAY(char, n)) makes tree-sitter's C++ grammar emit an ERROR
+ * node — it parses `char` in expression position — which cbm_collect_error_regions
+ * records as a `parse_partial` coverage gap, even though the file is a valid,
+ * in-file macro use with nothing actually missing from the graph. */
+TEST(extract_cpp_functionlike_macro_type_arg_no_false_parse_partial_issue1071) {
+    CBMFileResult *r = extract("#include <cstddef>\n"
+                               "#include <cstdlib>\n"
+                               "\n"
+                               "#define SYNTH_ALLOC_ARRAY(Type, Count) \\\n"
+                               "  ((Type*)std::malloc(sizeof(Type) * (Count)))\n"
+                               "\n"
+                               "struct Buffer {\n"
+                               "  char* data;\n"
+                               "  std::size_t size;\n"
+                               "};\n"
+                               "\n"
+                               "Buffer make_buffer(std::size_t n) {\n"
+                               "  Buffer b;\n"
+                               "  b.data = SYNTH_ALLOC_ARRAY(char, n);\n"
+                               "  b.size = n;\n"
+                               "  return b;\n"
+                               "}\n",
+                               CBM_LANG_CPP, "t", "alloc.cpp");
+    ASSERT_NOT_NULL(r);
+    ASSERT_FALSE(r->parse_incomplete); /* benign in-body macro call — not a coverage gap */
+    ASSERT(has_def(r, "Function", "make_buffer"));
+    ASSERT(has_def(r, "Macro", "SYNTH_ALLOC_ARRAY"));
+    cbm_free_result(r);
+    PASS();
+}
+
+/* #1071 guard: the suppression must be tight. A REAL parse error inside a
+ * function (not a macro call) must STILL be flagged, and a top-level macro
+ * invocation is covered by extract_cpp_preproc_macro_generated_callable_skipped_issue949. */
+TEST(extract_cpp_real_in_body_error_still_flagged_issue1071) {
+    /* `int x = ;` is a genuine syntax error inside foo()'s body — no macro
+     * involved, so the coverage gap must not be suppressed. */
+    CBMFileResult *r = extract("int foo() {\n"
+                               "  int x = ;\n"
+                               "  return x;\n"
+                               "}\n",
+                               CBM_LANG_CPP, "t", "broken.cpp");
+    ASSERT_NOT_NULL(r);
+    ASSERT_TRUE(r->parse_incomplete); /* real gap stays reported */
+    cbm_free_result(r);
+    PASS();
+}
+
 /* --- GDScript: AST -> graph visitor (Godot, #186) --- */
 TEST(extract_gdscript_issue186) {
     CBMFileResult *r = extract("extends Node\n"
@@ -809,6 +858,25 @@ TEST(ts_class) {
     ASSERT_NOT_NULL(r);
     ASSERT_FALSE(r->has_error);
     ASSERT(has_def(r, "Class", "Service"));
+    cbm_free_result(r);
+    PASS();
+}
+
+TEST(body_tokens_type_identifier) {
+    CBMFileResult *r = extract("function serialize(obj: MyModel): SerializedResult {\n"
+                               "  const result: SerializedResult = new SerializedResult();\n"
+                               "  return result;\n"
+                               "}\n",
+                               CBM_LANG_TYPESCRIPT, "t", "serial.ts");
+    ASSERT_NOT_NULL(r);
+    ASSERT_FALSE(r->has_error);
+    for (int i = 0; i < r->defs.count; i++) {
+        if (strcmp(r->defs.items[i].name, "serialize") == 0) {
+            ASSERT_NOT_NULL(r->defs.items[i].body_tokens);
+            ASSERT(strstr(r->defs.items[i].body_tokens, "SerializedResult") != NULL);
+            break;
+        }
+    }
     cbm_free_result(r);
     PASS();
 }
@@ -3692,6 +3760,81 @@ TEST(extract_rust_test_attr_marks_is_test_issue855) {
     PASS();
 }
 
+/* #1017: docstring truncation at MAX_COMMENT_LEN (500 bytes) can split a
+ * multi-byte UTF-8 character, leaving an incomplete byte sequence.
+ * Craft a Go comment whose 498th-500th bytes are a 3-byte CJK character
+ * (U+6210 = 成 = e6 88 90).  The raw byte truncation at offset 500 lands
+ * one byte past the character start, splitting it.  After the fix the
+ * truncated string must end on a complete codepoint boundary. */
+TEST(docstring_utf8_truncation_boundary_issue1017) {
+    /* Build a comment: "// " (3 bytes) + 495 ASCII 'A' + "成成成" (9 bytes)
+     * Total comment text = 3 + 495 + 9 = 507 bytes.
+     * MAX_COMMENT_LEN = 500.  The first kanji (成 = e6 88 90) occupies
+     * offsets 498-500, so text[500] = '\0' keeps bytes 0-499: the lead
+     * byte 0xe6 plus one continuation 0x88 — an incomplete 2-of-3 sequence.
+     * Before fix: the truncated string ended with that broken pair. */
+    char comment[600];
+    int off = 0;
+    comment[off++] = '/';
+    comment[off++] = '/';
+    comment[off++] = ' ';
+    for (int i = 0; i < 495; i++)
+        comment[off++] = 'A';
+    /* U+6210 (成) = 0xe6 0x88 0x90 — 3-byte UTF-8 */
+    const char *kanji = "\xe6\x88\x90";
+    for (int k = 0; k < 3; k++) {
+        memcpy(comment + off, kanji, 3);
+        off += 3;
+    }
+    comment[off] = '\0';
+
+    /* Wrap in a Go function so the comment becomes the docstring. */
+    char src[800];
+    snprintf(src, sizeof(src), "package main\n\n%s\nfunc Compute() {}\n", comment);
+
+    CBMFileResult *r = extract(src, CBM_LANG_GO, "test", "main.go");
+    ASSERT_NOT_NULL(r);
+    ASSERT_FALSE(r->has_error);
+    ASSERT(has_def(r, "Function", "Compute"));
+
+    const char *doc = NULL;
+    for (int i = 0; i < r->defs.count; i++) {
+        if (strcmp(r->defs.items[i].name, "Compute") == 0) {
+            doc = r->defs.items[i].docstring;
+            break;
+        }
+    }
+    ASSERT_NOT_NULL(doc);
+
+    /* Verify every byte in the truncated docstring is valid UTF-8:
+     * no trailing incomplete multi-byte sequence. */
+    size_t len = strlen(doc);
+    ASSERT_TRUE(len <= 500);
+    const unsigned char *u = (const unsigned char *)doc;
+    size_t i = 0;
+    while (i < len) {
+        unsigned char c = u[i];
+        int seq_len;
+        if (c < 0x80)
+            seq_len = 1;
+        else if ((c & 0xE0) == 0xC0)
+            seq_len = 2;
+        else if ((c & 0xF0) == 0xE0)
+            seq_len = 3;
+        else if ((c & 0xF8) == 0xF0)
+            seq_len = 4;
+        else
+            FAIL("invalid UTF-8 lead byte");
+        ASSERT_TRUE(i + (size_t)seq_len <= len);
+        for (int j = 1; j < seq_len; j++)
+            ASSERT_TRUE((u[i + (size_t)j] & 0xC0) == 0x80);
+        i += (size_t)seq_len;
+    }
+
+    cbm_free_result(r);
+    PASS();
+}
+
 /* Reproduce-first (ms-typescript reallyLargeFile.ts, 2026-07-07): a file
  * whose root node has hundreds of thousands of FLAT SIBLINGS (580k ////
  * comment lines in the 3.5 MB fourslash fixture) hung extraction for over
@@ -4580,6 +4723,8 @@ SUITE(extraction) {
     RUN_TEST(extract_ts_factory_object_methods_issue341);
     RUN_TEST(extract_c_macros_issue375);
     RUN_TEST(extract_cpp_macros_issue375);
+    RUN_TEST(extract_cpp_functionlike_macro_type_arg_no_false_parse_partial_issue1071);
+    RUN_TEST(extract_cpp_real_in_body_error_still_flagged_issue1071);
     RUN_TEST(extract_gdscript_issue186);
     RUN_TEST(extract_powershell_issue35);
     RUN_TEST(extract_luau_issue39);
@@ -4627,6 +4772,7 @@ SUITE(extraction) {
     RUN_TEST(js_class);
     RUN_TEST(ts_function);
     RUN_TEST(ts_class);
+    RUN_TEST(body_tokens_type_identifier);
     RUN_TEST(lua_function);
     RUN_TEST(bash_function);
     RUN_TEST(perl_function);
@@ -4816,6 +4962,7 @@ SUITE(extraction) {
     RUN_TEST(extract_c_clean_file_no_recovery_duplicates_issue961);
     RUN_TEST(walk_defs_no_truncation_over_4096_issue668);
     RUN_TEST(extract_rust_test_attr_marks_is_test_issue855);
+    RUN_TEST(docstring_utf8_truncation_boundary_issue1017);
 
     cbm_shutdown();
 }
