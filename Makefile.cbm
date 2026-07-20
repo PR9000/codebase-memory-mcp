@@ -92,13 +92,13 @@ STATIC_FLAGS := -static
 endif
 
 # Optional production hardening flags (intended for downstream package maintainers).
-# Enable with: gmake -f Makefile.cbm cbm FREEBSD_HARDENING=1
-# Disabled by default to preserve portable builds.
-FREEBSD_HARDENING ?= 0
+# Enable with: gmake -f Makefile.cbm cbm HARDENING=1
+# Enabled by default to preserve portable builds (opt-out via HARDENING=0).
+HARDENING ?= 1
 HARDEN_CFLAGS :=
 HARDEN_LDFLAGS :=
 
-ifeq ($(FREEBSD_HARDENING),1)
+ifeq ($(HARDENING),1)
 HARDEN_CFLAGS += -fstack-protector-strong -D_FORTIFY_SOURCE=2
 HARDEN_LDFLAGS += -Wl,-z,relro -Wl,-z,now
 endif
