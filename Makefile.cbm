@@ -99,8 +99,8 @@ HARDEN_CFLAGS :=
 HARDEN_LDFLAGS :=
 
 ifeq ($(HARDENING),1)
-HARDEN_CFLAGS += -fstack-protector-strong -D_FORTIFY_SOURCE=2
-HARDEN_LDFLAGS += -Wl,-z,relro -Wl,-z,now
+HARDEN_CFLAGS += -fstack-protector-strong -D_FORTIFY_SOURCE=2 -fPIE
+HARDEN_LDFLAGS += -Wl,-z,relro -Wl,-z,now -pie
 endif
 
 LDFLAGS = $(HARDEN_LDFLAGS) -lm -lstdc++ -lpthread -lz $(WIN32_LIBS) $(STATIC_FLAGS)
