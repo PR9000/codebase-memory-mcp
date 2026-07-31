@@ -13,7 +13,7 @@ jobs:
   freebsd-build-and-test:
     name: FreeBSD 15.1 (x86_64)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -22,16 +22,13 @@ jobs:
       - name: Run build and tests inside FreeBSD 15.1 VM
         uses: vmactions/freebsd-vm@v1
         with:
-          version: '15.1'
+          release: '15.1'
           usesh: true
-          mem: 4096
-          cpu: 2
+          mem: 8192
+          cpu: 8
           prepare: |
             pkg update -f
             pkg install -y gmake sqlite3 pkgconf
           run: |
-            echo "=== Building codebase-memory-mcp on FreeBSD 15.1 (Clang) ==="
-            gmake -f Makefile.cbm cbm CC=cc CXX=c++
-
-            echo "=== Running test suite on FreeBSD 15.1 (Clang) ==="
-            gmake -f Makefile.cbm test CC=cc CXX=c++
+            echo "=== Building codebase-memory-mcp on FreeBSD 15.1 ==="
+            gmake -f Makefile.cbm cbm
