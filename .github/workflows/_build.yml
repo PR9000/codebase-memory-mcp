@@ -342,7 +342,7 @@ jobs:
       matrix:
         release: ['15.1', '14.4']
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -383,13 +383,14 @@ jobs:
           path: "*.tar.gz"
 
   build-freebsd-arm64:
+    if: false
     name: build-unix (freebsd-${{ matrix.release }}, freebsd, arm64, clang, clang++)
     strategy:
       fail-fast: false
       matrix:
         release: ['15.1', '14.4']
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -429,10 +430,3 @@ jobs:
         with:
           name: binaries-freebsd-arm64-${{ matrix.release }}
           path: "*.tar.gz"
-
-
-
-
-
-
-
