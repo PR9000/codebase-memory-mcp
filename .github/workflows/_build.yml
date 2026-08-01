@@ -403,6 +403,7 @@ jobs:
         with:
           release: ${{ matrix.release }}
           arch: aarch64
+          sync: scp
           usesh: true
           mem: 6144
           cpu: 4
