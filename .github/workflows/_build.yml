@@ -336,50 +336,56 @@ jobs:
           path: "*.tar.gz"
 
   build-freebsd:
+    name: build-freebsd (${{ matrix.os }}, ${{ matrix.goos }}, ${{ matrix.goarch }}, ${{ matrix.cc }}, ${{ matrix.cxx }})
     strategy:
       fail-fast: false
       matrix:
         include:
           # FreeBSD 15.1
-          - release: '15.1'
-            arch: x86-64
+          - os: freebsd-15.1
+            release: '15.1'
+            goos: freebsd
+            arch: ''
+            display_arch: x86_64
             goarch: amd64
+            cc: clang
+            cxx: clang++
             sync: rsync
-          - release: '15.1'
+          - os: freebsd-15.1
+            release: '15.1'
+            goos: freebsd
             arch: aarch64
+            display_arch: aarch64
             goarch: arm64
+            cc: clang
+            cxx: clang++
             sync: rsync
-          - release: '15.1'
-            arch: powerpc64
-            goarch: ppc64
-            sync: rsync
-          - release: '15.1'
-            arch: riscv64
-            goarch: riscv64
-            sync: scp
           # FreeBSD 14.4
-          - release: '14.4'
-            arch: x86-64
+          - os: freebsd-14.4
+            release: '14.4'
+            goos: freebsd
+            arch: ''
+            display_arch: x86_64
             goarch: amd64
+            cc: clang
+            cxx: clang++
             sync: rsync
-          - release: '14.4'
+          - os: freebsd-14.4
+            release: '14.4'
+            goos: freebsd
             arch: aarch64
+            display_arch: aarch64
             goarch: arm64
+            cc: clang
+            cxx: clang++
             sync: rsync
-          - release: '14.4'
-            arch: powerpc64
-            goarch: ppc64
-            sync: rsync
-          - release: '14.4'
-            arch: riscv64
-            goarch: riscv64
-            sync: scp
-    runs-on: ubuntu-latest
-    timeout-minutes: 240
+    # Use native ARM runner for arm64; otherwise use x86_64
+    runs-on: ${{ matrix.goarch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Build FreeBSD ${{ matrix.release }} (${{ matrix.arch }}) binaries inside VM
+      - name: Build FreeBSD ${{ matrix.release }} (${{ matrix.display_arch }}) binaries inside VM
         uses: vmactions/freebsd-vm@v1
         with:
           release: ${{ matrix.release }}
@@ -392,11 +398,11 @@ jobs:
             pkg update -f
             pkg install -y gmake sqlite3 pkgconf node20 npm bash
           run: |
-            # 1. Compilar binário standard
+            # 1. Build standard binary
             gmake -f Makefile.cbm cbm
             scripts/package-release.sh freebsd ${{ matrix.goarch }}-${{ matrix.release }}
 
-            # 2. Compilar binário com UI
+            # 2. Build UI binary
             gmake -f Makefile.cbm cbm-with-ui
             scripts/package-release.sh freebsd ${{ matrix.goarch }}-${{ matrix.release }} --variant ui
 
@@ -416,6 +422,9 @@ jobs:
         with:
           name: binaries-freebsd-${{ matrix.goarch }}-${{ matrix.release }}
           path: "*.tar.gz"
+
+
+
 
 
 
