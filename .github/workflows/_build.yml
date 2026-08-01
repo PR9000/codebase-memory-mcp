@@ -387,7 +387,7 @@ jobs:
           path: "*.tar.gz"
 
   build-freebsd-arm64:
-    if: false
+    if: true
     name: build-unix (freebsd-${{ matrix.release }}, freebsd, arm64, clang, clang++)
     strategy:
       fail-fast: false
