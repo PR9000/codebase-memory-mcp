@@ -351,11 +351,11 @@ jobs:
         with:
           release: ${{ matrix.release }}
           usesh: true
-          mem: 8192
+          mem: 6144
           cpu: 4
           prepare: |
             pkg update -f
-            pkg install -y gmake sqlite3 pkgconf node20 npm bash
+            pkg install -y gmake sqlite3 pkgconf node22 npm-node22 bash
           run: |
             # 1. Build standard binary
             gmake -f Makefile.cbm cbm
@@ -400,11 +400,11 @@ jobs:
           release: ${{ matrix.release }}
           arch: aarch64
           usesh: true
-          mem: 8192
+          mem: 6144
           cpu: 4
           prepare: |
             pkg update -f
-            pkg install -y gmake sqlite3 pkgconf node20 npm bash
+            pkg install -y gmake sqlite3 pkgconf node22 npm-node22 bash
           run: |
             # 1. Build standard binary
             gmake -f Makefile.cbm cbm
