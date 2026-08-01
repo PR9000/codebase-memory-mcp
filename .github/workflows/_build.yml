@@ -357,6 +357,10 @@ jobs:
             pkg update -f
             pkg install -y gmake sqlite3 pkgconf node22 npm-node22 bash
           run: |
+            which python3 >/dev/null 2>&1 || ln -sf $(which python3.15 python3.14 python3.13 python3.12 python3.11 python3.10 2>/dev/null | head -n 1) /usr/local/bin/python3
+            echo "Python location: $(which python3 2>/dev/null || echo 'not found')"
+            python3 --version 2>&1 || true
+
             # 1. Build standard binary
             gmake -f Makefile.cbm cbm
             scripts/package-release.sh freebsd amd64-${{ matrix.release }}
@@ -406,6 +410,10 @@ jobs:
             pkg update -f
             pkg install -y gmake sqlite3 pkgconf node22 npm-node22 bash
           run: |
+            which python3 >/dev/null 2>&1 || ln -sf $(which python3.15 python3.14 python3.13 python3.12 python3.11 python3.10 2>/dev/null | head -n 1) /usr/local/bin/python3
+            echo "Python location: $(which python3 2>/dev/null || echo 'not found')"
+            python3 --version 2>&1 || true
+
             # 1. Build standard binary
             gmake -f Makefile.cbm cbm
             scripts/package-release.sh freebsd arm64-${{ matrix.release }}
