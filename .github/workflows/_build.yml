@@ -347,9 +347,12 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Build FreeBSD ${{ matrix.release }} (x86_64) binaries inside VM
+        # https://github.com/vmactions/freebsd-vm
         uses: vmactions/freebsd-vm@v1
         with:
           release: ${{ matrix.release }}
+          # Sync options: rsync, sshfs, nfs, scp, no
+          sync: rsync
           usesh: true
           mem: 6144
           cpu: 4
@@ -386,23 +389,27 @@ jobs:
           name: binaries-freebsd-amd64-${{ matrix.release }}
           path: "*.tar.gz"
 
-  build-freebsd-arm64:
+  build-freebsd-aarch64:
     if: true
-    name: build-unix (freebsd-${{ matrix.release }}, freebsd, arm64, clang, clang++)
+    name: build-unix (freebsd-${{ matrix.release }}, freebsd, aarch64, clang, clang++)
     strategy:
       fail-fast: false
       matrix:
         release: ['15.1', '14.4']
-    runs-on: ubuntu-24.04-arm
+    # Must use ubuntu-latest (x86_64 host). Running QEMU guest emulation on arm runners (ubuntu-*-arm)
+    # causes severe performance degradation leading to 3+ hour timeouts.
+    runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Build FreeBSD ${{ matrix.release }} (aarch64) binaries inside VM
+        # https://github.com/vmactions/freebsd-vm
         uses: vmactions/freebsd-vm@v1
         with:
           release: ${{ matrix.release }}
           arch: aarch64
+          # Sync options: rsync, sshfs, nfs, scp, no
           sync: scp
           usesh: true
           mem: 6144
@@ -417,25 +424,83 @@ jobs:
 
             # 1. Build standard binary
             gmake -f Makefile.cbm cbm
-            scripts/package-release.sh freebsd arm64-${{ matrix.release }}
+            scripts/package-release.sh freebsd aarch64-${{ matrix.release }}
 
             # 2. Build UI binary
             gmake -f Makefile.cbm cbm-with-ui
-            scripts/package-release.sh freebsd arm64-${{ matrix.release }} --variant ui
+            scripts/package-release.sh freebsd aarch64-${{ matrix.release }} --variant ui
 
       - name: Attest standard binary provenance
         if: ${{ inputs.attest }}
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
-          subject-path: codebase-memory-mcp-freebsd-arm64-${{ matrix.release }}.tar.gz
+          subject-path: codebase-memory-mcp-freebsd-aarch64-${{ matrix.release }}.tar.gz
 
       - name: Attest UI binary provenance
         if: ${{ inputs.attest }}
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
-          subject-path: codebase-memory-mcp-ui-freebsd-arm64-${{ matrix.release }}.tar.gz
+          subject-path: codebase-memory-mcp-ui-freebsd-aarch64-${{ matrix.release }}.tar.gz
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: binaries-freebsd-arm64-${{ matrix.release }}
+          name: binaries-freebsd-aarch64-${{ matrix.release }}
+          path: "*.tar.gz"
+
+  build-freebsd-riscv64:
+    if: true
+    name: build-unix (freebsd-${{ matrix.release }}, freebsd, riscv64, clang, clang++)
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ['15.1', '14.4']
+    # Must use ubuntu-latest (x86_64 host). Running QEMU guest emulation on arm runners (ubuntu-*-arm)
+    # causes severe performance degradation leading to 3+ hour timeouts.
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Build FreeBSD ${{ matrix.release }} (riscv64) binaries inside VM
+        # https://github.com/vmactions/freebsd-vm
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: ${{ matrix.release }}
+          arch: riscv64
+          # Sync options for riscv64: nfs, scp
+          sync: scp
+          usesh: true
+          mem: 6144
+          cpu: 4
+          prepare: |
+            pkg update -f
+            pkg install -y gmake sqlite3 pkgconf node22 npm-node22 bash
+          run: |
+            which python3 >/dev/null 2>&1 || ln -sf $(which python3.15 python3.14 python3.13 python3.12 python3.11 python3.10 2>/dev/null | head -n 1) /usr/local/bin/python3
+            echo "Python location: $(which python3 2>/dev/null || echo 'not found')"
+            python3 --version 2>&1 || true
+
+            # 1. Build standard binary
+            gmake -f Makefile.cbm cbm
+            scripts/package-release.sh freebsd riscv64-${{ matrix.release }}
+
+            # 2. Build UI binary
+            gmake -f Makefile.cbm cbm-with-ui
+            scripts/package-release.sh freebsd riscv64-${{ matrix.release }} --variant ui
+
+      - name: Attest standard binary provenance
+        if: ${{ inputs.attest }}
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: codebase-memory-mcp-freebsd-riscv64-${{ matrix.release }}.tar.gz
+
+      - name: Attest UI binary provenance
+        if: ${{ inputs.attest }}
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: codebase-memory-mcp-ui-freebsd-riscv64-${{ matrix.release }}.tar.gz
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: binaries-freebsd-riscv64-${{ matrix.release }}
           path: "*.tar.gz"
