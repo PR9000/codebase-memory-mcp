@@ -77,8 +77,8 @@ for arg in "$@"; do
 done
 [ -n "$GOOS" ] && [ -n "$GOARCH" ] || { usage >&2; exit 2; }
 case "$GOOS" in
-linux | darwin | windows) ;;
-*) echo "package-release: goos must be linux, darwin or windows." >&2; exit 2 ;;
+linux | darwin | windows | freebsd) ;;
+*) echo "package-release: goos must be linux, darwin, windows or freebsd." >&2; exit 2 ;;
 esac
 case "$VARIANT" in
 standard) SUFFIX="" ;;
