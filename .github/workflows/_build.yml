@@ -356,13 +356,6 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: "22"
-
-      - name: Build UI assets natively on host
-        run: cd graph-ui && npm ci && npm run build
-
       - name: Build FreeBSD ${{ matrix.release }} (${{ matrix.arch }}) binaries inside VM
         # https://github.com/vmactions/freebsd-vm
         uses: vmactions/freebsd-vm@v1
@@ -376,7 +369,7 @@ jobs:
           cpu: 4
           prepare: |
             pkg update -f
-            pkg install -y gmake sqlite3 pkgconf bash
+            pkg install -y gmake sqlite3 pkgconf node22 npm-node22 bash
           run: |
             which python3 >/dev/null 2>&1 || ln -sf $(which python3.15 python3.14 python3.13 python3.12 python3.11 python3.10 2>/dev/null | head -n 1) /usr/local/bin/python3
             echo "Python location: $(which python3 2>/dev/null || echo 'not found')"
@@ -405,4 +398,146 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: binaries-freebsd-${{ matrix.arch }}-${{ matrix.release }}
+          path: "*.tar.gz"
+
+  build-dragonflybsd:
+    name: build-unix (dragonflybsd-${{ matrix.release }}, dragonflybsd, x86_64, gcc, g++)
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ['6.4.2']
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Build DragonFlyBSD ${{ matrix.release }} (x86_64) binaries inside VM
+        # https://github.com/vmactions/dragonflybsd-vm
+        uses: vmactions/dragonflybsd-vm@v1
+        with:
+          release: ${{ matrix.release }}
+          usesh: true
+          mem: 6144
+          cpu: 4
+          prepare: |
+            pkg update -f
+            pkg install -y gmake sqlite3 pkgconf node22 npm-node22 bash
+          run: |
+            # 1. Build standard binary
+            gmake -f Makefile.cbm cbm
+            scripts/package-release.sh dragonflybsd x86_64-${{ matrix.release }}
+
+            # 2. Build UI binary
+            gmake -f Makefile.cbm cbm-with-ui
+            scripts/package-release.sh dragonflybsd x86_64-${{ matrix.release }} --variant ui
+
+      - name: Attest standard binary provenance
+        if: ${{ inputs.attest }}
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: codebase-memory-mcp-dragonflybsd-x86_64-${{ matrix.release }}.tar.gz
+
+      - name: Attest UI binary provenance
+        if: ${{ inputs.attest }}
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: codebase-memory-mcp-ui-dragonflybsd-x86_64-${{ matrix.release }}.tar.gz
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: binaries-dragonflybsd-x86_64-${{ matrix.release }}
+          path: "*.tar.gz"
+
+  build-openbsd:
+    name: build-unix (openbsd-${{ matrix.release }}, openbsd, x86_64, gcc, g++)
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ['7.9']
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Build OpenBSD ${{ matrix.release }} (x86_64) binaries inside VM
+        # https://github.com/vmactions/openbsd-vm
+        uses: vmactions/openbsd-vm@v1
+        with:
+          release: ${{ matrix.release }}
+          usesh: true
+          mem: 6144
+          cpu: 4
+          prepare: |
+            pkg_add gmake sqlite3 pkgconf node bash
+          run: |
+            # 1. Build standard binary
+            gmake -f Makefile.cbm cbm
+            scripts/package-release.sh openbsd x86_64-${{ matrix.release }}
+
+            # 2. Build UI binary
+            gmake -f Makefile.cbm cbm-with-ui
+            scripts/package-release.sh openbsd x86_64-${{ matrix.release }} --variant ui
+
+      - name: Attest standard binary provenance
+        if: ${{ inputs.attest }}
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: codebase-memory-mcp-openbsd-x86_64-${{ matrix.release }}.tar.gz
+
+      - name: Attest UI binary provenance
+        if: ${{ inputs.attest }}
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: codebase-memory-mcp-ui-openbsd-x86_64-${{ matrix.release }}.tar.gz
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: binaries-openbsd-x86_64-${{ matrix.release }}
+          path: "*.tar.gz"
+
+  build-netbsd:
+    name: build-unix (netbsd-${{ matrix.release }}, netbsd, x86_64, gcc, g++)
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ['11.0', '10.1']
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Build NetBSD ${{ matrix.release }} (x86_64) binaries inside VM
+        # https://github.com/vmactions/netbsd-vm
+        uses: vmactions/netbsd-vm@v1
+        with:
+          release: ${{ matrix.release }}
+          usesh: true
+          mem: 6144
+          cpu: 4
+          prepare: |
+            pkgin -y install gmake sqlite3 pkgconf nodejs bash
+          run: |
+            # 1. Build standard binary
+            gmake -f Makefile.cbm cbm
+            scripts/package-release.sh netbsd x86_64-${{ matrix.release }}
+
+            # 2. Build UI binary
+            gmake -f Makefile.cbm cbm-with-ui
+            scripts/package-release.sh netbsd x86_64-${{ matrix.release }} --variant ui
+
+      - name: Attest standard binary provenance
+        if: ${{ inputs.attest }}
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: codebase-memory-mcp-netbsd-x86_64-${{ matrix.release }}.tar.gz
+
+      - name: Attest UI binary provenance
+        if: ${{ inputs.attest }}
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: codebase-memory-mcp-ui-netbsd-x86_64-${{ matrix.release }}.tar.gz
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: binaries-netbsd-x86_64-${{ matrix.release }}
           path: "*.tar.gz"
