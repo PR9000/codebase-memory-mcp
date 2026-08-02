@@ -418,7 +418,9 @@ jobs:
           mem: 6144
           cpu: 4
           prepare: |
-            pkg_add gmake sqlite3 pkgconf nodejs bash
+            pkg_add pkgin || true
+            pkgin -y update
+            pkgin -y install gmake sqlite3 pkgconf nodejs
           run: |
             # 1. Build standard binary
             gmake -f Makefile.cbm cbm
