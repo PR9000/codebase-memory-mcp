@@ -342,6 +342,7 @@ jobs:
       matrix:
         release: ['15.1', '14.4']
         arch: ['x86_64']
+        # arch: ['x86_64', 'aarch64']
         # aarch64 disabled for now: lightningcss (a native Rust dependency of
         # the Vite/CSS build pipeline) publishes no prebuilt binary for
         # freebsd-arm64, so `npm run build` fails with "Cannot find module
@@ -354,9 +355,9 @@ jobs:
           - arch: x86_64
             artifact_arch: amd64
             sync: rsync
-          - arch: aarch64
-            artifact_arch: arm64-aarch64
-            sync: scp
+          # - arch: aarch64
+          #  artifact_arch: arm64-aarch64
+          #  sync: scp
     # Must use ubuntu-latest (x86_64 host). Running QEMU guest emulation on arm runners (ubuntu-*-arm)
     # causes severe performance degradation leading to 3+ hour timeouts.
     runs-on: ubuntu-latest
