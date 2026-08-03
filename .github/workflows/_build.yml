@@ -341,11 +341,21 @@ jobs:
       fail-fast: false
       matrix:
         release: ['15.1', '14.4']
-        arch: ['x86_64', 'aarch64']
+        arch: ['x86_64']
+        # aarch64 disabled for now: lightningcss (a native Rust dependency of
+        # the Vite/CSS build pipeline) publishes no prebuilt binary for
+        # freebsd-arm64, so `npm run build` fails with "Cannot find module
+        # '../lightningcss.freebsd-arm64.node'" — a real gap in that
+        # package's platform coverage, not something fixable on our side
+        # without vendoring a Rust build of it. Re-enable once lightningcss
+        # ships that target, or once the frontend build is moved to run
+        # natively on a Linux host instead of inside the FreeBSD VM.
         include:
           - arch: x86_64
+            artifact_arch: amd64
             sync: rsync
           - arch: aarch64
+            artifact_arch: arm64-aarch64
             sync: scp
     # Must use ubuntu-latest (x86_64 host). Running QEMU guest emulation on arm runners (ubuntu-*-arm)
     # causes severe performance degradation leading to 3+ hour timeouts.
@@ -385,20 +395,21 @@ jobs:
         if: ${{ inputs.attest }}
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
-          subject-path: codebase-memory-mcp-freebsd-${{ matrix.arch }}-${{ matrix.release }}.tar.gz
+          subject-path: codebase-memory-mcp-freebsd-${{ matrix.artifact_arch }}-${{ matrix.release }}.tar.gz
 
       - name: Attest UI binary provenance
         if: ${{ inputs.attest }}
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
-          subject-path: codebase-memory-mcp-ui-freebsd-${{ matrix.arch }}-${{ matrix.release }}.tar.gz
+          subject-path: codebase-memory-mcp-ui-freebsd-${{ matrix.artifact_arch }}-${{ matrix.release }}.tar.gz
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: binaries-freebsd-${{ matrix.arch }}-${{ matrix.release }}
+          name: binaries-freebsd-${{ matrix.artifact_arch }}-${{ matrix.release }}
           path: "*.tar.gz"
 
   build-netbsd:
+    if: false
     name: build-unix (netbsd-${{ matrix.release }}, netbsd, x86_64, gcc, g++)
     strategy:
       fail-fast: false
